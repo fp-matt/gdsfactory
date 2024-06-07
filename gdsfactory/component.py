@@ -103,6 +103,7 @@ _deprecated_attributes = {
 
 _deprecated_attributes_instance_settr = _deprecated_attributes - {"size_info"}
 _deprecated_attributes_component_gettr = _deprecated_attributes - {"move"}
+_deprecation_um = "in um is deprecated and will change to DataBaseUnits in gdsfactory9"
 
 
 class ComponentReference(kf.Instance):
@@ -124,8 +125,8 @@ class ComponentReference(kf.Instance):
             return object.__getattribute__(self, "_kfinst")
         if __k in _deprecated_attributes:
             logger.warning(
-                f"`{self._kfinst.name}.{__k}` is deprecated and will be removed soon."
-                f" Please use `{self._kfinst.name}.d{__k}` instead. For further information, please"
+                f"Getting `{self._kfinst.name}.{__k}` {_deprecation_um}. "
+                f"Please use `{self._kfinst.name}.d{__k}` instead. For further information, please"
                 "consult the migration guide "
                 "https://gdsfactory.github.io/gdsfactory/notebooks/"
                 "21_migration_guide_7_8.html",
@@ -167,10 +168,10 @@ class ComponentReference(kf.Instance):
         """Set attribute with deprecation warning for dbu based attributes."""
         if __k in _deprecated_attributes_instance_settr:
             logger.warning(
-                f"Setting `{self._kfinst.name}.{__k}` is deprecated and will be removed soon."
-                f" Please use `{self._kfinst.name}.d{__k}` instead.",
+                f"Setting `{self._kfinst.name}.{__k}` {_deprecation_um}. "
+                f"Please use `{self._kfinst.name}.d{__k}` instead.",
             )
-            return super().__setattr__("d" + __k, __v)
+            return super().__setattr__(f"d{__k}", __v)
         super().__setattr__(__k, __v)
 
 
@@ -288,8 +289,8 @@ class ComponentBase:
         """Shadow dbu based attributes with um based ones."""
         if __k in _deprecated_attributes_component_gettr:
             logger.warning(
-                f"`{self.name}.{__k}` is deprecated and will be removed soon."
-                f" Please use {self.name}.`d{__k}` instead. For further information, please"
+                f"Getting `{self.name}.{__k}` {_deprecation_um}. "
+                f"Please use {self.name}.`d{__k}` instead. For further information, please"
                 "consult the migration guide "
                 "https://gdsfactory.github.io/gdsfactory/notebooks/"
                 "21_migration_guide_7_8.html",
@@ -808,14 +809,19 @@ class ComponentBase:
             exclude_layers=exclude_layers,
         )
 
-    def get_netlist(self, flat: bool = False, **kwargs) -> dict[str, Any]:
-        """Returns a netlist for circuit simulation."""
-        from gdsfactory.get_netlist import get_netlist as _get_netlist
-        from gdsfactory.get_netlist_flat import get_netlist_flat as _get_netlist_flat
+    def get_netlist(self, recursive: bool = False, **kwargs) -> dict[str, Any]:
+        """Returns a netlist for circuit simulation.
 
-        return (
-            _get_netlist_flat(self, **kwargs) if flat else _get_netlist(self, **kwargs)
-        )
+        Args:
+            recursive: if True, returns a recursive netlist.
+            kwargs: keyword arguments to get_netlist.
+        """
+        from gdsfactory.get_netlist import get_netlist, get_netlist_recursive
+
+        if recursive:
+            return get_netlist_recursive(self, **kwargs)
+
+        return get_netlist(self, **kwargs)
 
     def write_netlist(self, filepath: str, **kwargs) -> None:
         """Write netlist in YAML."""
@@ -827,11 +833,16 @@ class ComponentBase:
         filepath.write_text(yaml_component)
 
     def plot_netlist(
-        self, with_labels: bool = True, font_weight: str = "normal", **kwargs
+        self,
+        recursive: bool = False,
+        with_labels: bool = True,
+        font_weight: str = "normal",
+        **kwargs,
     ):
         """Plots a netlist graph with networkx.
 
         Args:
+            recursive: if True, returns a recursive netlist.
             with_labels: add label to each node.
             font_weight: normal, bold.
             kwargs: keyword arguments to get_netlist.
@@ -847,18 +858,38 @@ class ComponentBase:
         import networkx as nx
 
         plt.figure()
-        netlist = self.get_netlist(**kwargs)
-        connections = netlist["connections"]
-        placements = netlist["placements"]
+        netlist = self.get_netlist(recursive=recursive, **kwargs)
         G = nx.Graph()
-        G.add_edges_from(
-            [
-                (",".join(k.split(",")[:-1]), ",".join(v.split(",")[:-1]))
-                for k, v in connections.items()
-            ]
-        )
-        pos = {k: (v["x"], v["y"]) for k, v in placements.items()}
-        labels = {k: ",".join(k.split(",")[:1]) for k in placements.keys()}
+
+        if recursive:
+            pos = {}
+            labels = {}
+            for net in netlist.values():
+                connections = net["connections"]
+                placements = net["placements"]
+                G.add_edges_from(
+                    [
+                        (",".join(k.split(",")[:-1]), ",".join(v.split(",")[:-1]))
+                        for k, v in connections.items()
+                    ]
+                )
+                pos.update({k: (v["x"], v["y"]) for k, v in placements.items()})
+                labels.update(
+                    {k: ",".join(k.split(",")[:1]) for k in placements.keys()}
+                )
+
+        else:
+            connections = netlist["connections"]
+            placements = netlist["placements"]
+            G.add_edges_from(
+                [
+                    (",".join(k.split(",")[:-1]), ",".join(v.split(",")[:-1]))
+                    for k, v in connections.items()
+                ]
+            )
+            pos = {k: (v["x"], v["y"]) for k, v in placements.items()}
+            labels = {k: ",".join(k.split(",")[:1]) for k in placements.keys()}
+
         nx.draw(
             G,
             with_labels=with_labels,
@@ -1041,76 +1072,18 @@ def container(component, function, **kwargs) -> Component:
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     import gdsfactory as gf
 
-    # c = gf.Component()
-    # wg1 = c << gf.c.straight(length=10, cross_section="rib")
-    # wg2 = c << gf.c.straight(length=5, cross_section="rib")
-    # wg2.connect("o1", wg1["o2"])
-    # wg2.dmovex(5)
-    # p = c.get_polygons()
-    # print(c.area(layer=(1, 0)))
-    # print(c.get_ports_list(prefix="o"))
+    cpl = (10, 20, 30, 40)
+    cpg = (0.2, 0.3, 0.5, 0.5)
+    dl0 = (0, 50, 100)
 
-    # c = gf.Component()
-    # b1 = gf.components.circle(radius=10)
-    # b2 = gf.components.circle(radius=11)
-
-    # ref = c << gf.c.bend_euler(cross_section="rib")
-    # c.add_ports(ref.ports)
-    # p = c.get_ports_list(sort_ports=True)
-    # print(c.get_ports_list(sort_ports=True))
-
-    # c = gf.Component()
-    # text = c << gf.components.text("hello")
-    # text.dmirror(
-    #     p1=kf.kdb.Point(1, 1), p2=gf.kdb.Point(1, 3)
-    # )  # Reflects across the line formed by p1 and p2
-    # c.remap_layers({(1, 0): (2, 0)})
-    # c.show()
-
-    # c.add_polygon([(0, 0), (1, 1), (1, 3)], layer=(1, 0))
-    # c = c.remove_layers(layers=[(1, 0), (2, 0)], recursive=True)
-    # c = c.extract(layers=[(1, 0)])
-
-    c1 = Component()
-    s = c1.add_polygon([(0, 0), (1, 1), (1, 3), (-3, 3)], layer=(1, 0))
-    c = Component()
-    c << c1
-    # r = kdb.Region(s.polygon)
-    # r.size(2000)  # size in DBU, and 1DBU = 1nm
-    # c.add_polygon(r, layer=(2, 0))
-    p = c.get_polygons()
-    print(p)
-
-    # c.add_polygon([(0, 0), (1, 1), (1, 3), (-3, 3)], layer="SLAB150")
-    # c.add_polygon([(0, 0), (1, 1), (1, 3), (-3, 3)], layer=LAYER.WG)
-    # c.create_port(name="o1", position=(10, 10), angle=1, layer=LAYER.WG, width=2000)
-    # c.add_port(name="o1", center=(0, 0), orientation=270, layer=LAYER.WG, width=2.0)
-    # c.add_label(text="hello", position=(2, 2), layer=LAYER.TEXT)
-    # p = c.add_polygon(np.array(list(zip((-8, 6, 7, 9), (-6, 8, 17, 5)))), layer=(1, 0))
-
-    # p = c.add_polygon(list(zip((-8, 6, 7, 9), (-6, 8, 17, 5))), layer=(1, 0))
-    # p2 = p + 2
-    # p2 = c.add_polygon(p2, layer=(1, 0))
-
-    # p3 = p2 - p
-    # p3 = c.add_polygon(p3, layer=(2, 0))
-
-    # P = gf.path.straight(length=10)
-    # s0 = gf.Section(
-    #     width=1, offset=0, layer=(1, 0), name="core", port_names=("o1", "o2")
-    # )
-    # s1 = gf.Section(width=3, offset=0, layer=(3, 0), name="slab")
-    # x1 = gf.CrossSection(sections=(s0, s1))
-    # c1 = gf.path.extrude(P, x1)
-    # ref = c.add_ref(c1)
-    # c.add_ports(ref.ports)
-    # scene = c.to_3d()
-    # scene.show()
-
-    # c = gf.c.straight()
-    # print(c.to_dict())
-    # print(c.area(layer=(1, 0)))
-    # stl = gf.export.to_stl(c)
+    c = gf.c.mzi_lattice(
+        coupler_lengths=cpl, coupler_gaps=cpg, delta_lengths=dl0, length_x=1
+    )
+    n = c.get_netlist(recursive=True)
+    c.plot_netlist(recursive=True)
+    plt.show()
     c.show()
