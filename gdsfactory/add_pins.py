@@ -126,7 +126,7 @@ def get_pin_triangle_polygon_tip(
     p1 = p.dcenter + _rotate(dtop, rot_mat)
     port_face = [p0, p1]
 
-    ptip = p.dcenter + _rotate(dtip, rot_mat)
+    ptip = tuple(p.dcenter + _rotate(dtip, rot_mat))
 
     polygon = list(port_face) + [ptip]
     polygon = np.stack(polygon)
