@@ -17,7 +17,7 @@ from rich.table import Table
 if TYPE_CHECKING:
     pass
 
-__version__ = "7.8.5"
+__version__ = "8.0.0"
 PathType = str | pathlib.Path
 
 home = pathlib.Path.home()
@@ -111,6 +111,7 @@ class Paths:
     klayout = generic_tech / "klayout"
     klayout_tech = klayout
     klayout_lyp = klayout_tech / "layers.lyp"
+    klayout_lyt = klayout_tech / "tech.lyt"
     klayout_yaml = generic_tech / "layer_views.yaml"
     schema_netlist = repo_path / "tests" / "schemas" / "netlist.json"
     netlists = module_path / "samples" / "netlists"
@@ -141,10 +142,3 @@ def rich_output() -> None:
     from rich import pretty
 
     pretty.install()
-
-
-if __name__ == "__main__":
-    pass
-    # print(CONF.pdk)
-    # print_version_plugins()
-    # print_version_pdks()

@@ -9,6 +9,7 @@ authors = [{name = "gdsfactory community", email = "contact@gdsfactory.com"}]
 classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Operating System :: OS Independent"
 ]
 dependencies = [
@@ -33,7 +34,7 @@ dependencies = [
   "types-PyYAML",
   "typer<1",
   "watchdog<5",
-  "kfactory[git,ipy]~=0.17.0",
+  "kfactory[git,ipy]~=0.17.1",
   "freetype-py",
   "mapbox_earcut",
   "networkx",
@@ -47,7 +48,7 @@ license = {file = "LICENSE"}
 name = "gdsfactory"
 readme = "README.md"
 requires-python = ">=3.10"
-version = "7.27.0"
+version = "8.0.0"
 
 [project.optional-dependencies]
 cad = [
@@ -213,7 +214,7 @@ message_template = "Bump to {new_version}"
 tag_template = "v{new_version}"
 
 [tool.tbump.version]
-current = "7.27.0"
+current = "8.0.0"
 regex = '''
   (?P<major>\d+)
   \.
